@@ -1,102 +1,103 @@
-#include <stdio.h>
 #include "raylib.h"
-#include <math.h>
+#include "raymath.h"
+
+#define KEY_SELECT KEY_ENTER
+#define KEY_NEXT   KEY_SPACE
 
 typedef enum {
-    SCENE_MAIN = 0,
+    SCENE_MAIN,
     SCENE_GAME
 } Scene;
 
-char* text2 = "SKINS";
-char* text = "PLAY";
-int fontSize = 40;
 Scene activeScene = SCENE_MAIN;
 
-Texture2D car;
-float carX = 0;
-float carY = 0;
-int carXDir = 1;
-int carYDir = 1;
-float carSpeed = 600;
-float cameraTilt = 0.4;
-float fov = 0.6;
-int roadFragments = 25;
-float roadPercentage = 0.7;
+Vector3 carPosition = {0};
+Vector3 carAcceleration = {0};
+Camera3D camera = {0};
 
-int button_state = -1;
-
-void tickMainMenu(void) {
-    int w = GetRenderWidth();
-    int h = GetRenderHeight();
-
-    if (IsKeyPressed(KEY_ENTER)) {
-        activeScene = SCENE_GAME;
-    }
-
-    if (IsKeyPressed(KEY_SPACE)) {
-        button_state = button_state*(-1);
-    }
-    
-    
-    
-    
-    int button_width = w/5;
-    int button_hight = h/5;
-    int textP_length = MeasureText(text2, fontSize)/2;
-    int text_length = MeasureText(text, fontSize)/2;
-
-    BeginDrawing();
-        ClearBackground(BLACK);
-        
-        if (button_state==1){
-            DrawRectangle(w/4 - text_length, h/2-fontSize, button_width, button_hight, GRAY);
-        }
-        else{
-            DrawRectangle(3*w/4 - textP_length, h/2-fontSize, 3*w/4, h/5, GRAY);
-        }
-        
-        DrawText(text, 3*(w/4) - text_length, h/2-fontSize/2, fontSize, WHITE);
-        DrawText(text2, w/4 - textP_length, h/2-fontSize/2, fontSize, WHITE);
-    EndDrawing();
+void drawButton(int x, int y, int w, int h, const char* text, int fontSize) {
+    DrawRectangle(x, y, w, h, SKYBLUE);
+    DrawText(text, x + w / 2 - MeasureText(text, fontSize) / 2, y + h / 2 - fontSize / 2, fontSize, BLACK);
 }
 
-void tickGame(void) {
-    float w = GetRenderWidth();
-    float h = GetRenderHeight();
-    float dt = GetFrameTime();
+void updateCamera(void) {
+    UpdateCamera(&camera, CAMERA_FREE);
+}
 
-    float roadWidth = w * roadPercentage;
-    float roadFragmentHeight = ceilf(h * (1 - cameraTilt) / roadFragments);
+void startGame(void) {
+    activeScene = SCENE_GAME;
 
-    carX += carXDir * dt * carSpeed;
-    carY += carYDir * dt * carSpeed;
+    camera.up = (Vector3){ 0.0f, 1.0f, 0.0f };
+    camera.fovy = 45.0f;
+    camera.projection = CAMERA_PERSPECTIVE;
+    updateCamera();
+    //carPosition = (Vector3){ 0.0f, 1.0f, 0.0f };
 
-    if (carY + car.height >= h || carY <= 0) carYDir *= -1;
-    if (carX + car.width >+ w || carX <= 0)  carXDir *= -1;
+    camera.position = Vector3Add(carPosition, (Vector3){ 0.0f, 0.0f, 10.0f });
+    camera.target = Vector3Add(carPosition, (Vector3){ 0.0f, 0.0f, 0.0f });
 
-    BeginDrawing();
-        ClearBackground(BLUE);
-        DrawRectangle(0, h * cameraTilt, w, h * (1 - cameraTilt), GREEN);
-
-        for (int i = 0; i < roadFragments; i++) {
-            float fragmentWidth = roadWidth * fov + roadWidth * (1 - fov) / roadFragments * i;
-            DrawRectangle(w / 2 - fragmentWidth / 2 + (((float)roadFragments)/((float)i+2))*20, h * cameraTilt + i * roadFragmentHeight, fragmentWidth, roadFragmentHeight, BLACK);
-        }
-
-        DrawTexture(car, w / 2 - car.width / 2, h - car.height, WHITE);
-    EndDrawing();
 }
 
 int main(void) {
-    InitWindow(800, 600, "gra");
-    SetWindowState(FLAG_WINDOW_RESIZABLE);
+    // init window
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    SetTargetFPS(60);
+    InitWindow(1000, 600, "gra");
+    DisableCursor();
 
-    car = LoadTexture("images/car.png");
+    // load assets
+    Model car = LoadModel("./assets/car.obj");
 
+    // game loop
     while (!WindowShouldClose()) {
-        if (activeScene == SCENE_MAIN) tickMainMenu();
-        else if (activeScene == SCENE_GAME) tickGame();
+        switch (activeScene) {
+            // main menu
+            case SCENE_MAIN: {
+                float w = GetRenderWidth();
+
+                if (IsKeyPressed(KEY_SELECT)) {
+                    startGame();
+                }
+
+                BeginDrawing();
+                    ClearBackground(RAYWHITE);
+
+                    drawButton(w / 2 - 100, 100, 200, 50, "play", w / 10);
+                EndDrawing();
+            } break;
+
+            // game
+            case SCENE_GAME: {
+                float dt = GetFrameTime();
+                BoundingBox carBoundingBox = GetModelBoundingBox(car);
+                carBoundingBox.min = Vector3Add(carBoundingBox.min, carPosition);
+                carBoundingBox.max = Vector3Add(carBoundingBox.max, carPosition);
+
+                //carPosition.x += 10*dt;
+                updateCamera();
+
+                BeginDrawing();
+
+                    ClearBackground(SKYBLUE);
+
+                    BeginMode3D(camera);
+
+                        DrawPlane((Vector3){0, 0, 0}, (Vector2){100, 100}, GREEN);
+                        DrawGrid(10, 1.0f);
+                        DrawModel(car, carPosition, 1, WHITE);
+                        DrawBoundingBox(carBoundingBox, GREEN);
+
+                    EndMode3D();
+
+                    DrawFPS(10, 10);
+
+                EndDrawing();
+            } break;
+        }
     }
+
+    // clean up
+    CloseWindow();
 
     return 0;
 }

@@ -1,1 +1,1 @@
-gcc main.c raylib/src/libraylib.a -Iraylib/src -lm -lwinmm -lgdi32 -o gra
+gcc main.c raylib/src/libraylib.a -Iraylib/src -lm -lwinmm -lgdi32 -Wall -Wextra -o gra

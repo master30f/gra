@@ -1,0 +1,1 @@
+gcc fyz.c raylib/src/libraylib.a -Iraylib/src -lm -lwinmm -lgdi32 -Wall -Wextra -o fyz
