@@ -1,7 +1,9 @@
+#define  STB_DS_IMPLEMENTATION
+#include "stb_ds.h"
+
 #include "raylib.h"
 #include "raymath.h"
 #include "stdio.h"
-
 
 // misc
 #define FONT_SIZE         20
@@ -24,12 +26,34 @@
 
 char stringBuffer[256] = { 0 };
 
+/*typedef enum {
+    OBJECT_TREE
+} ObjectType;*/
+
+typedef struct {
+    Model model;
+    Vector3 position;
+    float scale;
+} Object;
+
+Object *levelObjects = NULL;
 
 int main(void)
 {
     InitWindow(1000, 600, "Physics test");
     SetTargetFPS(60);
     DisableCursor();
+
+    arrput(levelObjects, ((Object){
+        .model    = LoadModelFromMesh(GenMeshPlane(100, 100, 1, 1)),
+        .position = { 0 },
+        .scale    = 1.0f
+    }));
+    arrput(levelObjects, ((Object){
+        .model    = LoadModel("./assets/tree01.obj"),
+        .position = (Vector3){ 0, 0, 0 },
+        .scale    = 0.01f
+    }));
 
     Model car = LoadModel("./assets/car.obj");
 
@@ -93,7 +117,12 @@ int main(void)
             BeginMode3D(camera);
                 ClearBackground(RAYWHITE);
 
-                DrawGrid(500, 1.0f);
+                for (int i = 0; i < arrlen(levelObjects); i++) {
+                    Object object = levelObjects[i];
+                    DrawModel(object.model, object.position, object.scale, WHITE);
+                }
+
+                //DrawGrid(500, 1.0f);
                 DrawModel(car, r, 1.0f, WHITE);
             EndMode3D();
 
