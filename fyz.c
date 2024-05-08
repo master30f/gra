@@ -15,10 +15,11 @@
 #define MPS2KMPH          3.6f
 
 // car
-#define CAR_ACCELERATION  18.0f/MPS2KMPH*PSS
+#define CAR_ACCELERATION  40.0f/MPS2KMPH*PSS
 #define CAR_DECELERAION   10.0f*PSS
-#define CAR_MAX_SPEED     200.0f/MPS2KMPH*PS
+#define CAR_MAX_SPEED     130.0f/MPS2KMPH*PS
 #define CAR_TURN_FORCE    2*DEG2RAD
+
 
 // camera
 #define CAMERA_FOCUS      (Vector3){ 4.0f, 1.0f, 0.0f }
@@ -26,6 +27,10 @@
 
 
 char stringBuffer[256] = { 0 };
+
+float CAR_DRIFT_SPEED = 1*PS;
+float CAR_DRIFT_FORCE = 0;
+float CAR_DRIFT = 0;
 
 typedef enum {
     OBJECT_GROUND
@@ -99,6 +104,9 @@ int main(void)
     Model ground = LoadModelFromMesh(GenMeshPlane(200, 200, 1, 1));
     ground.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = LoadTexture("./assets/track.png");
 
+    BoundingBox carBoundingBox = GetModelBoundingBox(car);
+    BoundingBox notCarBoundingBox;
+
     while (!WindowShouldClose())
     {
         // update
@@ -113,18 +121,27 @@ int main(void)
         {
             queuedTime -= SNAPSHOT_LENGTH;
 
-            float inputFactor = 1*IsKeyDown(KEY_W) + -1*IsKeyDown(KEY_S);
+            
+        //Vector3RotateByAxisAngle(Vector3RotateByAxisAngle(Vector3RotateByAxisAngle(carBoundingBox.min, (Vector3){1, 0, 0}, rot.x), (Vector3){0, 1, 0}, rot.y), (Vector3){0, 0, 1}, rot.z);
+            
+            
+            
+            
+            notCarBoundingBox.max = Vector3Add(Vector3RotateByAxisAngle(Vector3RotateByAxisAngle(Vector3RotateByAxisAngle(carBoundingBox.max, (Vector3){1, 0, 0}, rot.x), (Vector3){0, 1, 0}, rot.y), (Vector3){0, 0, 1}, rot.z), r);
+            notCarBoundingBox.min = Vector3Add(Vector3RotateByAxisAngle(Vector3RotateByAxisAngle(Vector3RotateByAxisAngle(carBoundingBox.min, (Vector3){1, 0, 0}, rot.x), (Vector3){0, 1, 0}, rot.y), (Vector3){0, 0, 1}, rot.z), r);
+            //ovladani auta 
 
+            float inputFactor = 1*IsKeyDown(KEY_W) + -1*IsKeyDown(KEY_S);
 
             if(IsKeyDown(KEY_SPACE))
             {
                 if (engineV >= 0)
                 {
-                    engineV = fmaxf(0, engineV - CAR_DECELERAION - 5*engineV/((float)CAR_MAX_SPEED));
+                    engineV = fmaxf(0, engineV - CAR_DECELERAION - engineV/50);
                 }
                 else
                 {
-                    engineV = fminf(0, engineV + CAR_DECELERAION - 5*engineV/((float)CAR_MAX_SPEED));
+                    engineV = fminf(0, engineV + CAR_DECELERAION - engineV/50);
                 }
 
                 engineV = fmaxf(0, engineV - CAR_DECELERAION - 10*engineV/CAR_MAX_SPEED);
@@ -133,13 +150,84 @@ int main(void)
             {
                 engineV += (CAR_MAX_SPEED - engineV)/((float)CAR_MAX_SPEED)*CAR_ACCELERATION*inputFactor;
             }
+
+
+
+            //driftovani
+
+            if(IsKeyDown(KEY_LEFT_SHIFT) && IsKeyDown(KEY_A) && !IsKeyDown(KEY_D)){
+                    if(CAR_DRIFT_FORCE > 35 || CAR_DRIFT_FORCE < -35) CAR_DRIFT_SPEED = 0.2;
+                    if(CAR_DRIFT_FORCE < 35) CAR_DRIFT_SPEED = 1;
+
+            }else if(IsKeyDown(KEY_LEFT_SHIFT) && IsKeyDown(KEY_D) && !IsKeyDown(KEY_A)){
+                    if(CAR_DRIFT_FORCE < -35 || CAR_DRIFT_FORCE < 35) CAR_DRIFT_SPEED = -0.2;
+                    if(CAR_DRIFT_FORCE > -35) CAR_DRIFT_SPEED = -1;
+
+            }else if(CAR_DRIFT_FORCE > 0 && (!IsKeyDown(KEY_A) || !IsKeyDown(KEY_LEFT_SHIFT))){
+                CAR_DRIFT_FORCE = fmaxf(0, CAR_DRIFT_FORCE - 1.6);
+                CAR_DRIFT_SPEED = 0;
+
+            }else if(CAR_DRIFT_FORCE < 0 && (!IsKeyDown(KEY_D) || !IsKeyDown(KEY_LEFT_SHIFT))){
+                CAR_DRIFT_FORCE = fminf(0, CAR_DRIFT_FORCE + 1.6);
+                CAR_DRIFT_SPEED = 0;
+
+            }
+            
+            CAR_DRIFT_FORCE += CAR_DRIFT_SPEED;
+
+            
+
+            
+
+            if (CAR_DRIFT_FORCE != 0) {
+                if(-35 > CAR_DRIFT_FORCE || CAR_DRIFT_FORCE > 35){
+                    if (engineV >= 0)
+                    {
+                        engineV = fmaxf(0, engineV - CAR_DECELERAION - engineV/5000);
+                    }
+                    else
+                    {
+                        engineV = fminf(0, engineV + CAR_DECELERAION - engineV/5000);
+                    }
+                }else{
+                    if (engineV >= 0)
+                    {
+                        engineV = fmaxf(0, engineV - CAR_DECELERAION - engineV/20000);
+                    }
+                    else
+                    {
+                        engineV = fminf(0, engineV + CAR_DECELERAION - engineV/20000);
+                    }
+                }
+            
+            }
+
+            if(CAR_DRIFT_FORCE < 0){
+                CAR_DRIFT = (360 + CAR_DRIFT_FORCE);
+            }else{
+                CAR_DRIFT = CAR_DRIFT_FORCE;
+            }
+
+
+            
+            //rotace
+
+            if (IsKeyDown(KEY_D)) rot.y -= CAR_TURN_FORCE*engineV*2;
+            if (IsKeyDown(KEY_A)) rot.y += CAR_TURN_FORCE*engineV*2;
+            if (CAR_DRIFT_FORCE != 0) rot.y += CAR_DRIFT_FORCE*CAR_TURN_FORCE*engineV/15;
+
+            
+            
+            car.transform = MatrixRotateXYZ(rot);
+
             v = Vector3Transform((Vector3){ engineV, 0.0f, 0.0f }, car.transform);
+            v = Vector3Add(v, (Vector3){0, -9.81*PS, 0});
+           
+            if(notCarBoundingBox.min.y<=0){
+                v.y+=9.81*PS;
+            }
 
             r = Vector3Add(r, v);
-
-            if (IsKeyDown(KEY_A)) rot.y += CAR_TURN_FORCE*engineV/((float)CAR_MAX_SPEED);
-            if (IsKeyDown(KEY_D)) rot.y -= CAR_TURN_FORCE*engineV/((float)CAR_MAX_SPEED);
-            car.transform = MatrixRotateXYZ(rot);
 
             camera.target   = Vector3Add(r, Vector3Transform(CAMERA_FOCUS, car.transform));
             cameraT         = Vector3Add(r, Vector3Transform(CAMERA_TARGET_POS, car.transform));
@@ -158,8 +246,11 @@ int main(void)
                     DrawModel(object.model, object.data.position, object.data.scale, GREEN);
                 }
 
+
                 DrawModel(ground, (Vector3){0.0f, 0.0f, 0.0f}, 1.0f, WHITE);
-                DrawModel(car, r, 1.0f, WHITE);
+                DrawModelEx(car, r, (Vector3){0, CAR_DRIFT, 0}, CAR_DRIFT_FORCE, (Vector3){1, 1, 1}, WHITE);
+                DrawPoint3D(notCarBoundingBox.max, GREEN);
+                DrawPoint3D(notCarBoundingBox.min, RED);
             EndMode3D();
 
             sprintf(stringBuffer, "%d FPS", GetFPS());
